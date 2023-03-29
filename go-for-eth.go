@@ -50,6 +50,7 @@ func main() {
 	type transaction struct {
 		ts   *types.Transaction
 		time uint64
+		from common.Address
 	}
 	// 创建通道用于存储交易记录
 	txCh := make(chan transaction)
@@ -69,15 +70,17 @@ func main() {
 					continue
 				}
 				for _, tx := range block.Transactions() {
-					if tx.To() == nil {
-						continue
+					// 获取发送者地址
+					from, err := types.Sender(types.NewEIP155Signer(tx.ChainId()), tx)
+					if err != nil {
+						fmt.Println("获取发送者地址失败：", err)
+						return
 					}
-					if tx.To().Hex() != fromAddr.Hex() {
-						continue
+					if from == fromAddr || tx.To() != nil && tx.To().Hex() == fromAddr.Hex() {
+						// 将交易记录发送到通道中
+						txCh <- transaction{ts: tx, time: block.Time(), from: from}
 					}
 
-					// 将交易记录发送到通道中
-					txCh <- transaction{ts: tx, time: block.Time()}
 				}
 			}
 		}(blockRange*int64(i), blockRange*(int64(i)+1))
@@ -91,12 +94,7 @@ func main() {
 
 	// 遍历通道读取交易记录并输出到文件
 	for tx := range txCh {
-		// 获取发送者地址
-		from, err := types.Sender(types.NewEIP155Signer(tx.ts.ChainId()), tx.ts)
-		if err != nil {
-			fmt.Println("获取发送者地址失败：", err)
-			return
-		}
+
 		// 获取交易时间
 		tm := time.Unix(int64(tx.time), 0)
 		datetime := tm.Format("2006-01-02 15:04:05")
@@ -104,7 +102,7 @@ func main() {
 		value := tx.ts.Value().String()
 		to := *tx.ts.To()
 		// 写入文件
-		line := fmt.Sprintf("%s %s %s %v\n", datetime, from.Hex(), to.Hex(), library.EtherConvertAmount(value))
+		line := fmt.Sprintf("%s %s %s %v\n", datetime, tx.from.Hex(), to.Hex(), library.EtherConvertAmount(value))
 		fmt.Printf("line：%x\n", line)
 		_, err = file.WriteString(line)
 		if err != nil {

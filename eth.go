@@ -61,13 +61,13 @@ func main() {
 		}
 
 		for _, tx := range block.Transactions() {
-			if tx.To() != nil && *tx.To() == address {
-				// 获取发送者地址
-				from, err := types.Sender(types.NewEIP155Signer(tx.ChainId()), tx)
-				if err != nil {
-					fmt.Println("获取发送者地址失败：", err)
-					return
-				}
+			// 获取发送者地址
+			from, _ := types.Sender(types.NewEIP155Signer(tx.ChainId()), tx)
+			//if err != nil {
+			//	fmt.Println("获取发送者地址失败：", err)
+			//	return
+			//}
+			if from == address || tx.To() != nil && *tx.To() == address {
 				// 获取交易时间
 				tm := time.Unix(int64(block.Time()), 0)
 				datetime := tm.Format("2006-01-02 15:04:05")
